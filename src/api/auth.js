@@ -1,15 +1,26 @@
 import { supabase } from './supabase'
 import { afterWrite } from './cache'
 
-let failedAttempts = 0
-let lockoutUntil = 0
+// ─── how the 4-digit access code maps onto a Supabase Auth account ────────
+// Supabase rejects passwords shorter than 6 characters, so the code is
+// prefixed. The prefix is public — it ships in the bundle — and adds no
+// entropy; it only satisfies the length rule. The four digits are still the
+// only secret, which is why Supabase's own sign-in rate limiting matters.
+const ADMIN_EMAIL = 'admin@teodorcas.app'
+const PASSWORD_PREFIX = 'teodorcas'
 
-// ─── cached config (admin code + store mode) ──────────────────────────────
+export function derivePassword(code) {
+  return PASSWORD_PREFIX + String(code || '')
+}
+
+// ─── store mode: 'selling' | 'debtors' ────────────────────────────────────
+// config holds the mode only. The access code lives in Supabase Auth now and
+// is never readable from the client.
 
 export async function fetchConfig() {
   const { data, error } = await supabase
     .from('config')
-    .select('admin_code, app_mode')
+    .select('app_mode')
     .eq('id', 'access_codes')
     .single()
 
@@ -20,46 +31,44 @@ export async function fetchConfig() {
 // ─── login ────────────────────────────────────────────────────────────────
 
 export async function login(code) {
-  if (Date.now() < lockoutUntil) {
-    const waitSec = Math.ceil((lockoutUntil - Date.now()) / 1000)
-    throw new Error(`Too many failed attempts. Try again in ${waitSec}s.`)
+  const { error } = await supabase.auth.signInWithPassword({
+    email: ADMIN_EMAIL,
+    password: derivePassword(code),
+  })
+
+  if (!error) return { role: 'admin' }
+
+  const message = String(error.message || '')
+  if (/invalid login credentials/i.test(message)) {
+    throw new Error('Incorrect code. Try again.')
   }
-
-  // Always a live read at login — never trust a cached code here.
-  const { data, error } = await supabase
-    .from('config')
-    .select('admin_code')
-    .eq('id', 'access_codes')
-    .single()
-
-  if (error) throw new Error('Unable to connect. Check your connection.')
-
-  if (code === data.admin_code) {
-    failedAttempts = 0
-    return { role: 'admin' }
+  if (/rate|too many|over_email/i.test(message)) {
+    throw new Error('Too many attempts. Wait a moment and try again.')
   }
-
-  failedAttempts++
-  if (failedAttempts >= 5) {
-    lockoutUntil = Date.now() + (failedAttempts - 4) * 30000 // escalating lockout
-    failedAttempts = 0
-    throw new Error('Too many failed attempts. Account locked temporarily.')
-  }
-
-  throw new Error('Incorrect code. Try again.')
+  throw new Error('Unable to connect. Check your connection.')
 }
 
+export async function signOut() {
+  try {
+    await supabase.auth.signOut()
+  } catch {
+    // signing out locally must never fail on a network hiccup
+  }
+}
+
+/**
+ * Resetting the access code is resetting the Supabase Auth password. It
+ * needs a live session, so it can only be done from a signed-in device —
+ * the anon key on its own has no way in.
+ */
 export async function updateAdminCode(newCode) {
-  const { error } = await supabase
-    .from('config')
-    .update({ admin_code: newCode, updated_at: new Date().toISOString() })
-    .eq('id', 'access_codes')
+  const { error } = await supabase.auth.updateUser({
+    password: derivePassword(newCode),
+  })
 
   if (error) throw new Error('Failed to update admin code.')
   await afterWrite('config')
 }
-
-// ─── store mode: 'selling' | 'debtors' ────────────────────────────────────
 
 export async function updateAppMode(mode) {
   const { error } = await supabase

@@ -1,37 +1,56 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
-import { login as apiLogin, fetchConfig, updateAdminCode as updateAdminCodeApi } from '../api/auth'
-import { getCollection, subscribe, clearCache } from '../api/cache'
+import { supabase } from '../api/supabase'
+import { login as apiLogin, signOut as apiSignOut, updateAdminCode as updateAdminCodeApi } from '../api/auth'
+import { clearCache } from '../api/cache'
 import { warmUp } from '../api/prefetch'
-import { createSession, validateSession, SESSION_KEY } from '../utils/session'
 
 const AuthContext = createContext(null)
 const INACTIVITY_TIMEOUT = 30 * 60 * 1000 // 30 minutes
-const CONFIG_DEPS = ['config']
 
 export function AuthProvider({ children }) {
   const [role, setRole] = useState(null)
   const [loading, setLoading] = useState(true)
   const roleRef = useRef(role)
   const lastActivity = useRef(Date.now())
-  const sessionCode = useRef(null)
 
   roleRef.current = role
 
-  // Restore session on mount — a valid token paints the app instantly from
-  // the last mirror, while warmUp() refreshes everything underneath it.
+  // Supabase Auth owns the session, so wait for it before painting anything.
+  // A session that is still valid opens straight onto the dashboard and
+  // warms the mirror; one that has expired drops to the login screen rather
+  // than a blank page. Nothing here polls.
   useEffect(() => {
-    const token = localStorage.getItem(SESSION_KEY)
-    if (token) {
-      const session = validateSession(token)
+    let mounted = true
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return
+        if (data.session) {
+          setRole('admin')
+          lastActivity.current = Date.now()
+          warmUp().catch(() => {})
+        }
+        setLoading(false)
+      })
+      .catch(() => { if (mounted) setLoading(false) })
+
+    // Keeps role and storage in step for the life of the tab.
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
       if (session) {
-        setRole(session.role)
-        sessionCode.current = session.code
-        warmUp().catch(() => {})
+        setRole('admin')
+        lastActivity.current = Date.now()
       } else {
-        localStorage.removeItem(SESSION_KEY)
+        setRole(null)
+        clearCache()
       }
+    })
+
+    return () => {
+      mounted = false
+      sub.subscription.unsubscribe()
     }
-    setLoading(false)
   }, [])
 
   // Track user activity
@@ -53,56 +72,37 @@ export function AuthProvider({ children }) {
 
   function forceLogout() {
     setRole(null)
-    sessionCode.current = null
-    localStorage.removeItem(SESSION_KEY)
+    lastActivity.current = Date.now()
     clearCache()
-  }
-
-  // Re-validate the session code whenever config is refetched (a write, or
-  // the warm-up after a reload) — a changed code signs the session out.
-  async function checkSession() {
-    if (!roleRef.current || !sessionCode.current) return
-    try {
-      const config = await getCollection('config', CONFIG_DEPS, fetchConfig)
-      if (config && config.admin_code !== sessionCode.current) forceLogout()
-    } catch {}
+    apiSignOut()
   }
 
   useEffect(() => {
     if (!role) return
 
-    const unsubscribe = subscribe('config', checkSession)
+    // Inactivity only — session validity is handled by Supabase Auth, so
+    // nothing here reads the database on a timer.
     const interval = setInterval(() => {
       if (Date.now() - lastActivity.current > INACTIVITY_TIMEOUT) forceLogout()
     }, 10000)
 
-    return () => {
-      unsubscribe()
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
   }, [role])
 
   async function loginWithCredentials(code) {
-    const result = await apiLogin(code)
-    const token = createSession(code, result.role)
-    localStorage.setItem(SESSION_KEY, token)
-    sessionCode.current = code
-    lastActivity.current = Date.now()
-    setRole(result.role)
+    await apiLogin(code)
     // A fresh login starts from a clean mirror and fetches everything once.
     clearCache()
     await warmUp()
   }
 
   /**
-   * Changing the admin code must not sign the current session out, so the
-   * stored token is reissued with the new code straight away.
+   * Resets the Supabase Auth password, which is what the access code has
+   * become. The token is issued by Supabase and stays valid, so the current
+   * session is not signed out.
    */
   async function changeAdminCode(newCode) {
     await updateAdminCodeApi(newCode)
-    const currentRole = roleRef.current || 'admin'
-    localStorage.setItem(SESSION_KEY, createSession(newCode, currentRole))
-    sessionCode.current = newCode
   }
 
   function logout() {

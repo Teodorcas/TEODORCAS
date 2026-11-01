@@ -34,25 +34,34 @@ VITE_SUPABASE_ANON_KEY=your_anon_key_here
 
 ### 3. Supabase Setup
 
-The full schema lives in [`supabase-schema.sql`](./supabase-schema.sql) at the
-repo root. Paste it into the Supabase SQL Editor (Dashboard → SQL Editor → New
-Query) and run it **once**.
+Work through these **once**, in this order:
 
-It creates:
+1. [`supabase-schema.sql`](./supabase-schema.sql) — builds the tables.
+2. [`supabase-security.sql`](./supabase-security.sql) — turns on Row Level
+   Security and moves the access code into a table the anon role cannot read.
+   Safe to re-run.
+3. **Enable Supabase Auth** — this is what actually closes the database. At
+   the top of [`supabase-auth.sql`](./supabase-auth.sql) are the three
+   dashboard steps: turn on the Email provider, **turn sign-ups off**, and add
+   the single admin user. Then run that file, which drops the interim access
+   code layer and swaps every policy from `anon` to `authenticated`.
+
+The tables it leaves you with:
 
 | Table | Purpose |
 |---|---|
-| `config` | Access code and the global Selling / Debtors mode |
+| `config` | The global Selling / Debtors mode only |
 | `drugs` | Drug catalogue with carton + sachet stock and pricing |
 | `sales` | One row per line item (multi-drug checkout writes several rows) |
 | `debtors` | Debtor names |
 | `debtor_entries` | Debt and payment ledger, with a running `balance_after` |
 | `sync_state` | Version counters bumped by database triggers — kept, no longer read by the app |
 
-It also seeds `config` with the default admin code and `app_mode = 'selling'`.
+`config` is seeded with `app_mode = 'selling'`. `admin_credentials` exists
+between steps 2 and 3 and is dropped by step 3.
 
-> **Note:** RLS is intentionally **not** enabled — see
-> [Before going public](#before-going-public).
+> **Note:** RLS is on for every table. After step 3 only a signed-in session
+> can reach them — see [Before going public](#before-going-public).
 
 ### 4. Run Locally
 
@@ -66,7 +75,9 @@ Default login code:
 
 - **Admin:** `1234`
 
-> Change it immediately after first login via **Settings → Access Code**.
+> The Supabase admin user is created with the password `teodorcas` + that code,
+> so the default is `teodorcas1234`. Change it immediately after first login
+> via **Settings → Access Code** — that updates the Supabase Auth password.
 
 ### 5. Build for Production
 
@@ -160,17 +171,58 @@ when the app asks on purpose.
 
 ## Before going public
 
-This build is currently meant for **local / private use**. Before opening it to
-anyone else, add:
+The site is deployed, so this section matters. Two of the three items below are
+done; the third is not.
 
-1. **Row Level Security** on every table in Supabase.
-2. **Supabase Auth** so the anon key is no longer a blanket credential — right
-   now anyone with the deployed URL and anon key can reach the REST API
-   directly.
-3. A code review of `vercel.json` — it still carries a stale `/api/*` rewrite
-   from the previous version of this project, and the `android-twa/`,
-   `public/.well-known/assetlinks.json` and `public/icons/` folders still carry
-   the old app's name, package id and URL.
+### 1. The access code is a real credential — done
+
+The code is no longer a value the client reads and compares against. It is
+the password of the single Supabase Auth account, so there is no readable
+copy anywhere: not in `config`, not in the JS bundle, not in a database
+column. Changing it in **Settings → Access Code** resets that password.
+
+The interim `admin_credentials` table and the two `SECURITY DEFINER`
+functions from `supabase-security.sql` are dropped by `supabase-auth.sql`.
+They were a stepping stone between "code readable by anyone with the anon
+key" and this, and leaving unreachable functions behind is only attack
+surface.
+
+### 2. Row Level Security now protects the data — done
+
+Every request reaches the tables as a signed-in `authenticated` session. The
+`anon` role has no policies and no table grants left, so the anon key alone
+signs nothing in — someone holding it cannot read or rewrite your stock,
+sales and debtor balances.
+
+Two things are carrying the weight, and it is worth knowing which:
+
+- **Supabase's sign-in rate limiting.** The 4-digit code is mapped onto the
+  Supabase password by prefixing it (`teodorcas` + the code), which is why it
+  clears the 6-character minimum. The prefix is public in the bundle and adds
+  no entropy at all. 10,000 combinations behind a login screen is a lock on
+  the door, not the door.
+- **RLS.** This is the part that actually changed. The gate used to be
+  cosmetic — a scripted client never had to pass it.
+
+If you want the code itself to be strong, make it six digits (`OtpInput`
+takes a `length` prop) and drop the prefix; six digits is 1,000,000
+combinations rather than 10,000, for the same login screen.
+
+**Sign-ups must stay off** in Authentication → Settings. Leave them on and
+anyone can register an account that passes every policy above.
+
+A stronger setup still exists — move every query behind a Vercel serverless
+function holding the `service_role` key, so the browser never receives a
+Supabase key at all. Much larger refactor, and not needed for this app's
+threat model.
+
+### 3. Leftovers from the previous app — still open
+
+`vercel.json` carries a stale `/api/*` rewrite, and `android-twa/`,
+`public/.well-known/assetlinks.json` and `public/icons/` still carry the old
+app's name, package id and URL. The APK build is deliberately the last task.
+Signing material (`*.keystore`, `cert.der`, `*.apk`, `twa-manifest.json`) is
+gitignored and must stay that way.
 
 ---
 

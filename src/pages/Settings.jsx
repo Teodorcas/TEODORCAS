@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useAppMode } from '../context/AppModeContext'
 import { useToast } from '../context/ToastContext'
-import { fetchConfig } from '../api/auth'
-import { getCollection } from '../api/cache'
 import { getSales, resetAllData } from '../api/sales'
 import { generateStatement } from '../utils/generateStatement'
 import { TopBar } from '../components/layout/TopBar'
@@ -128,12 +126,12 @@ export default function Settings() {
   async function handleUpdateAdmin(newCode) {
     setCodeLoading(true)
     try {
-      const current = await getCollection('config', ['config'], fetchConfig).catch(() => null)
-      if (current && newCode === current.admin_code) {
-        throw new Error('That is already the current code.')
-      }
+      // AuthContext holds the current code and sends it to the server, which
+      // will not accept a change without it. It also rejects "new == current".
       await changeAdminCode(newCode)
       showToast('Admin code updated.')
+    } catch (err) {
+      showToast(err.message || 'Failed to update admin code.', 'error')
     } finally {
       setCodeLoading(false)
     }

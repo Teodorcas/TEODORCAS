@@ -8,18 +8,36 @@ drop table if exists debtors cascade;
 drop table if exists sales cascade;
 drop table if exists drugs cascade;
 drop table if exists sync_state cascade;
+drop table if exists admin_credentials cascade;
 drop table if exists config cascade;
 drop table if exists otp_codes cascade;
 
 -- ─── CONFIG ────────────────────────────────────────────────
+-- Holds only the store mode. The admin code is deliberately NOT here: this
+-- table has to stay readable for the Selling / Debtors switch, and anything
+-- the anon role can read is public. See admin_credentials below.
 create table config (
   id text primary key default 'access_codes',
-  admin_code text not null default '1234',
   app_mode text not null default 'selling' check (app_mode in ('selling', 'debtors')),
   updated_at timestamptz default now()
 );
 
-insert into config (id, admin_code, app_mode) values ('access_codes', '1234', 'selling');
+insert into config (id, app_mode) values ('access_codes', 'selling');
+
+-- ADMIN CREDENTIALS — the access code, hashed.
+-- RLS is on with no policy, so the anon role gets nothing from this table.
+-- The app reaches it only through the verify_admin_code() and
+-- change_admin_code() SECURITY DEFINER functions in supabase-security.sql.
+create table admin_credentials (
+  id text primary key default 'access_codes',
+  code_hash text not null,
+  failed_attempts integer not null default 0,
+  locked_until timestamptz,
+  updated_at timestamptz default now()
+);
+
+insert into admin_credentials (id, code_hash)
+values ('access_codes', encode(sha256(convert_to('1234', 'UTF8')), 'hex'));
 
 -- ─── DRUGS ─────────────────────────────────────────────────
 -- pack_type 'sachet' -> sold/stored as loose sachets (sachets_per_carton = 1)
@@ -120,3 +138,10 @@ create trigger trg_debtors_sync  after insert or update or delete on debtors
   for each statement execute function bump_sync_state();
 create trigger trg_entries_sync  after insert or update or delete on debtor_entries
   for each statement execute function bump_sync_state();
+
+-- ─── ROW LEVEL SECURITY ───────────────────────────────────────────────────
+-- This file only builds the tables. Now run supabase-security.sql in the
+-- same SQL Editor: it turns RLS on for every table, locks admin_credentials
+-- away from the anon role and adds the two functions the app uses to check
+-- and change the access code. Until it has run, the admin code is readable
+-- by anyone holding the anon key.
