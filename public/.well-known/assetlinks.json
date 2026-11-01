@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.dvine.store",
+      "package_name": "com.teodorcas.pharmacy",
       "sha256_cert_fingerprints": [
-        "2E:54:17:31:02:FA:A3:07:61:72:F2:28:50:6B:74:15:36:0D:2E:3F:76:2E:23:35:CD:38:F6:4B:FA:03:ED:88"
+        "6F:12:25:8F:3C:C8:4A:C5:F6:8B:85:4D:A1:9F:28:2D:73:5A:C1:C8:14:E4:5D:9E:62:07:1C:9D:71:82:FD:93"
       ]
     }
   }

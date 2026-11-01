@@ -5,8 +5,8 @@ dist
 android-twa/app/build
 android-twa/build
 
-# Android signing material and build outputs. The repo is public and the APK
-# build is the last task on the list, so none of this may ever be committed.
+# Android signing material, machine-specific config and build outputs. The
+# repo is public, so none of this may ever be committed.
 *.keystore
 *.jks
 *.apk
@@ -15,7 +15,8 @@ android-twa/build
 cert.der
 manifest-checksum.txt
 android-twa/.gradle/
+android-twa/local.properties
 
-# Bubblewrap-generated TWA manifest. It carries the signing password and the
-# old D-VINE host. Regenerated during the TWA/APK step, never committed.
+# Bubblewrap-generated TWA manifest. It carries the release keystore password,
+# so it is regenerated locally during the APK step and never committed.
 android-twa/twa-manifest.json

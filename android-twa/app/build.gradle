@@ -21,11 +21,11 @@ plugins {
 }
 
 def twaManifest = [
-    applicationId: 'com.dvine.store',
-    hostName: 'dvine-phi.vercel.app', // The domain being opened in the TWA.
+    applicationId: 'com.teodorcas.pharmacy',
+    hostName: 'teodorcas.vercel.app', // The domain being opened in the TWA.
     launchUrl: '/', // The start path for the TWA. Must be relative to the domain.
-    name: 'D-VINE', // The application name.
-    launcherName: 'D-VINE', // The name shown on the Android Launcher.
+    name: 'TEODORCAS', // The application name.
+    launcherName: 'TEODORCAS', // The name shown on the Android Launcher.
     themeColor: '#1A56DB', // The color used for the status bar.
     themeColorDark: '#000000', // The color used for the dark status bar.
     navigationColor: '#1A56DB', // The color used for the navigation bar.
@@ -52,13 +52,13 @@ def twaManifest = [
 
 android {
     compileSdkVersion 36
-    namespace "com.dvine.store"
+    namespace "com.teodorcas.pharmacy"
     defaultConfig {
-        applicationId "com.dvine.store"
+        applicationId "com.teodorcas.pharmacy"
         minSdkVersion 21
         targetSdkVersion 36
-        versionCode 3
-        versionName "1.0.1"
+        versionCode 1
+        versionName "1.0.0"
 
         // The name for the application
         resValue "string", "appName", twaManifest.name
@@ -76,7 +76,7 @@ android {
             // The URL the Web Manifest for the Progressive Web App that the TWA points to. This
             // is used by Chrome OS and Meta Quest to open the Web version of the PWA instead of
             // the TWA, as it will probably give a better user experience for non-mobile devices.
-            resValue "string", "webManifestUrl", 'https://dvine-phi.vercel.app/manifest.json'
+            resValue "string", "webManifestUrl", 'https://teodorcas.vercel.app/manifest.json'
         
 
         

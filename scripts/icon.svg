@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- TEODORCAS app icon: white medicine bottle on deep blue.
+       The cross is painted in the background colour rather than cut out —
+       the field is flat, so the two are indistinguishable and the shape
+       stays a single simple path. -->
+  <rect width="512" height="512" fill="#1240A8"/>
+  <!-- cap -->
+  <rect x="160" y="110" width="192" height="70" rx="20" fill="#FFFFFF"/>
+  <!-- body, tucked up under the cap so the shoulder has no seam -->
+  <rect x="176" y="168" width="160" height="236" rx="28" fill="#FFFFFF"/>
+  <!-- cross -->
+  <path fill="#1240A8" d="M232 236h48v112h-48z M204 268h104v48h-104z"/>
+</svg>
