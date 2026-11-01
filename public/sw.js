@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teodorcas-v1'
+const CACHE_NAME = 'teodorcas-v2'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -29,6 +29,27 @@ self.addEventListener('fetch', (event) => {
 
   const isNavigation = event.request.mode === 'navigate'
 
+  // Navigations go to the network first, so a redeploy shows up on the very
+  // next load. Cache is only the offline fallback. Without this, a cached
+  // index.html keeps booting the previous bundle until something else
+  // happened to evict it.
+  if (isNavigation) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+          }
+          return response
+        })
+        .catch(() => caches.match('/index.html'))
+    )
+    return
+  }
+
+  // Everything else stays cache-first, with the cache refreshed in the
+  // background so the next load picks the new copy up.
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetched = fetch(event.request).then((response) => {
@@ -37,12 +58,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
         }
         return response
-      }).catch(() => {
-        if (isNavigation) {
-          return caches.match('/index.html')
-        }
-        return cached
-      })
+      }).catch(() => cached)
       return cached || fetched
     })
   )

@@ -4,7 +4,9 @@ import './index.css'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    // updateViaCache: 'none' stops the browser serving a stale sw.js out of
+    // its HTTP cache, so a redeploy always reaches the worker.
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {})
   })
 }
 
