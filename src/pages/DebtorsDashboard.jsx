@@ -7,6 +7,7 @@ import { fetchDebtors, fetchDebtorEntries, buildSummaries, recordDebt, recordPay
 import { useCollection } from '../hooks/useCollection'
 import { TopBar } from '../components/layout/TopBar'
 import { BottomNav } from '../components/layout/BottomNav'
+import { PharmacistCash } from '../components/illustrations/PharmacistCash'
 import { ConfirmModal } from '../components/ui/ConfirmModal'
 import { AutoFitText } from '../components/ui/AutoFitText'
 import { formatCurrency } from '../utils/formatters'
@@ -44,7 +45,7 @@ export default function DebtorsDashboard() {
   const totalOwed = active.reduce((sum, s) => sum + s.balance, 0)
 
   return (
-    <div className="min-h-screen bg-brand-bg">
+    <div className="min-h-screen bg-brand-bg flex flex-col">
       <TopBar
         title={getGreeting()}
         subtitle="TEODORCAS · Debtors"
@@ -59,7 +60,7 @@ export default function DebtorsDashboard() {
         }
       />
 
-      <div className="max-w-[480px] mx-auto px-4 pt-16 pb-28 flex flex-col gap-4">
+      <div className="w-full max-w-[480px] mx-auto px-4 pt-16 pb-40 flex-1 flex flex-col gap-4">
         {/* Stat cards */}
         <div className="grid [grid-template-columns:2fr_3fr] gap-3 pt-2">
           <div className="bg-slate-dark rounded-card shadow-card p-4 flex flex-col gap-2 overflow-hidden">
@@ -97,35 +98,45 @@ export default function DebtorsDashboard() {
           </div>
         </div>
 
-        {/* Two actions */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setRecordOpen(true)}
-            className="min-h-[52px] flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-card shadow-card transition-colors"
-          >
-            <UserPlus size={18} />
-            Record Debt
-          </button>
-          <button
-            onClick={() => setPayOpen(true)}
-            className="min-h-[52px] flex items-center justify-center gap-2 bg-accent hover:bg-accent-dark text-white text-sm font-bold rounded-card shadow-card transition-colors"
-          >
-            <HandCoins size={18} />
-            Pay Debt
-          </button>
+        {/* The two actions are docked above the bottom nav, so this middle
+            space carries the illustration and the empty state instead. */}
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 py-2">
+          <PharmacistCash className="w-full max-w-[300px] h-auto" />
+          {active.length === 0 && (
+            <div className="flex flex-col items-center gap-1 text-center px-4 -mt-1">
+              <p className="text-sm font-medium text-gray-500">No one owes money right now</p>
+              <p className="text-xs text-gray-400">Tap "Record Debt" to add a customer's debt</p>
+            </div>
+          )}
         </div>
-
-        {/* Empty state */}
-        {active.length === 0 && (
-          <div className="bg-white rounded-card shadow-card p-8 flex flex-col items-center gap-2 text-center">
-            <Users size={32} className="text-gray-200" />
-            <p className="text-sm font-medium text-gray-500">No one owes money right now</p>
-            <p className="text-xs text-gray-400">Tap "Record Debt" to add a customer's debt</p>
-          </div>
-        )}
       </div>
 
-      <BottomNav />
+      {/* FIXED BOTTOM — the two actions dock above the nav and never scroll,
+          the same shape as the Record a Sale bar on the selling dashboard. */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none">
+        <div className="max-w-[480px] mx-auto pointer-events-auto">
+          <div className="bg-white border-t border-gray-100 px-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setRecordOpen(true)}
+                className="min-h-[52px] flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white text-sm font-bold rounded-card transition-colors"
+              >
+                <UserPlus size={18} />
+                Record Debt
+              </button>
+              <button
+                onClick={() => setPayOpen(true)}
+                className="min-h-[52px] flex items-center justify-center gap-2 bg-accent hover:bg-accent-dark text-white text-sm font-bold rounded-card transition-colors"
+              >
+                <HandCoins size={18} />
+                Pay Debt
+              </button>
+            </div>
+          </div>
+
+          <BottomNav inline />
+        </div>
+      </div>
 
       {recordOpen && (
         <RecordDebtModal

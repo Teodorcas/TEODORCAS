@@ -48,10 +48,11 @@ export default function Drugs() {
             {isAdmin && (
               <button
                 onClick={() => navigate('/drugs/add')}
-                className="flex items-center gap-1.5 min-h-[34px] px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-btn hover:bg-primary-dark transition-colors"
+                aria-label="Register a drug"
+                title="Register a drug"
+                className="flex items-center justify-center gap-1.5 min-h-[34px] px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-btn hover:bg-primary-dark transition-colors"
               >
                 <Plus size={14} />
-                Register
               </button>
             )}
             <button
@@ -121,7 +122,7 @@ export default function Drugs() {
                 {search ? 'No drugs match your search' : 'No drugs registered yet'}
               </p>
               {isAdmin && !search && (
-                <p className="text-xs text-gray-400">Tap "+ Register" to get started</p>
+                <p className="text-xs text-gray-400">Tap "+" to get started</p>
               )}
             </div>
           ) : (
